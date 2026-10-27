@@ -1,71 +1,69 @@
 const mineflayer = require('mineflayer');
 
-const CONFIG = {
-  host: process.env.MC_HOST || 'Oblivion-Q9T9.aternos.me',
-  port: Number(process.env.MC_PORT) || 28648,
-  username: process.env.MC_USER || 'BOT24_7',
-  version: false,
-};
-
-const CHEST_NAMES = ['chest', 'trapped_chest', 'barrel'];
-const ACTION_INTERVAL_MS = 45_000;
-const BASE_RETRY_MS = 30_000;
-const MAX_RETRY_MS = 5 * 60_000;
-
-let retries = 0;
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 function createBot() {
-  const bot = mineflayer.createBot(CONFIG);
-  let routine = null;
-  let busy = false;
+    const bot = mineflayer.createBot({
+        host: 'Oblivion-Q9T9.aternos.me', // <--- REEMPLAZA ESTO POR LA IP DE TU SERVER
+        port: 28648,                // Puerto predeterminado de Minecraft
+        username: 'BOT_24/7',    // Nombre genérico del bot/NPC dentro del juego
+        version: false              // Autodetecta la versión exacta del servidor (1.8 a 1.21+)
+    });
 
-  async function tick() {
-    if (busy || !bot.entity) return;
-    busy = true;
-    try {
-      const ids = CHEST_NAMES
-        .map((n) => bot.registry.blocksByName[n]?.id)
-        .filter((id) => id !== undefined);
+    bot.on('spawn', () => {
+        console.log(`[NPC] El bot ha aparecido correctamente en el mapa.`);
+        // Si tu servidor No-Premium requiere contraseña, descomenta la línea de abajo:
+        // setTimeout(() => bot.chat('/login erickJKN'), 4000);
+    });
 
-      const block = bot.findBlock({ matching: ids, maxDistance: 5 });
+    bot.on('login', () => {
+        console.log(`[NPC] Conexión establecida con el servidor de Minecraft.`);
+    });
 
-      if (block) {
-        const container = await bot.openContainer(block);
-        await sleep(2000);
-        container.close();
-      }
+    // Rutina automatizada del NPC: Buscar cofre, interactuar, cerrar y saltar (Cada 45 segundos)
+    setInterval(async () => {
+        if (!bot || !bot.entity) return;
 
-      bot.setControlState('jump', true);
-      await sleep(500);
-      bot.setControlState('jump', false);
-      console.log('[NPC] Ciclo anti-inactividad completado.');
-    } catch (err) {
-      console.log(`[NPC] Error en el ciclo: ${err.message}`);
-    } finally {
-      busy = false;
-    }
-  }
+        try {
+            // 1. Localizar el bloque de cofre en un radio de 5 bloques
+            const chestBlock = bot.findBlock({
+                matching: bot.registry.blocksByName.chest.id,
+                maxDistance: 5
+            });
 
-  bot.once('spawn', () => {
-    retries = 0;
-    console.log('[NPC] Bot en el mapa.');
-    routine = setInterval(tick, ACTION_INTERVAL_MS);
-  });
+            if (chestBlock) {
+                console.log('[NPC] Interactuando con el contenedor cercano...');
+                
+                // 2. Abrir el contenedor (genera la animación y sonido físico en el servidor)
+                const chest = await bot.openChest(chestBlock);
+                console.log('[NPC] Contenedor abierto.');
+                
+                // Mantener la interfaz abierta durante 2 segundos simulando actividad de inventario
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // 3. Cerrar la interfaz del contenedor
+                chest.close();
+                console.log('[NPC] Contenedor cerrado.');
+            } else {
+                console.log('[NPC] Aviso: No se detectó ningún contenedor válido cerca.');
+            }
 
-  bot.on('end', (reason) => {
-    if (routine) clearInterval(routine);
-    const delay = Math.min(BASE_RETRY_MS * 2 ** retries, MAX_RETRY_MS);
-    retries++;
-    console.log(`[NPC] Desconectado (${reason}). Reintentando en ${delay / 1000}s...`);
-    setTimeout(createBot, delay);
-  });
+            // 4. Ejecutar acción de salto físico para evitar la inactividad (Anti-AFK)
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            bot.setControlState('jump', true);
+            setTimeout(() => bot.setControlState('jump', false), 500);
+            console.log('[NPC] Acción anti-inactividad completada con éxito.');
 
-  bot.on('kicked', (reason) => console.log(`[NPC] Expulsado: ${reason}`));
-  bot.on('error', (err) => console.log(`[NPC] Error de red: ${err.message}`));
+        } catch (err) {
+            console.log(`[NPC] Error en el ciclo de ejecución: ${err.message}`);
+        }
+    }, 45000);
+
+    // Sistema de auto-reconexión segura tras expulsiones o reinicios del servidor
+    bot.on('end', (reason) => {
+        console.log(`[NPC] Conexión finalizada por: ${reason}. Reintentando en 25 segundos...`);
+        setTimeout(createBot, 25000);
+    });
+
+    bot.on('error', (err) => console.log(`[NPC] Error crítico de red detectado: ${err}`));
 }
 
 createBot();
