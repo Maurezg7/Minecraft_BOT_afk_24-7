@@ -1,0 +1,25 @@
+name: Minecraft NPC Bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+concurrency:
+  group: minecraft-bot
+  cancel-in-progress: true
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install mineflayer
+      - run: node bot.js
+        env:
+          MC_HOST: Oblivion-Q9T9.aternos.me
+          MC_PORT: 28648
