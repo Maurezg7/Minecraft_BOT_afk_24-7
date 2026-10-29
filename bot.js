@@ -6,8 +6,9 @@ const CONFIG = {
   host: process.env.MC_HOST || 'Oblivion-Q9T9.aternos.me',
   port: Number(process.env.MC_PORT) || 28648,
   username: process.env.MC_USER || 'BOT_24_7',
-  // Versión de Minecraft: se autodetecta desde el servidor si no se define MC_VERSION.
-  version: process.env.MC_VERSION || false,
+  // version: false -> mineflayer autodetecta la versión del servidor al hacer ping.
+  // 26.3 es la versión del BOT, no de Minecraft; no se usa como versión de protocolo.
+  version: false,
 };
 
 const BASE_RETRY_MS = 30_000;
@@ -113,4 +114,15 @@ function createBot() {
   });
 }
 
-createBot();
+function start() {
+  try {
+    createBot();
+  } catch (err) {
+    const delay = Math.min(BASE_RETRY_MS * 2 ** retries, MAX_RETRY_MS);
+    retries++;
+    log(`No se pudo crear el bot (${err.message}). Reintentando en ${delay / 1000}s...`);
+    setTimeout(start, delay);
+  }
+}
+
+start();
