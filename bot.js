@@ -1,10 +1,13 @@
 const mineflayer = require('mineflayer');
 
+const BOT_VERSION = '26.3';
+
 const CONFIG = {
   host: process.env.MC_HOST || 'Oblivion-Q9T9.aternos.me',
   port: Number(process.env.MC_PORT) || 28648,
   username: process.env.MC_USER || 'BOT_24_7',
-  version: false,
+  // Versión de Minecraft: se autodetecta desde el servidor si no se define MC_VERSION.
+  version: process.env.MC_VERSION || false,
 };
 
 const BASE_RETRY_MS = 30_000;
@@ -54,6 +57,7 @@ function createBot() {
       bot.swingArm('left');
     },
     async chest() {
+      if (!bot.registry) return actions.swing();
       const ids = CHEST_NAMES
         .map((n) => bot.registry.blocksByName[n]?.id)
         .filter((id) => id !== undefined);
@@ -92,7 +96,8 @@ function createBot() {
   // --- Ciclo de vida -------------------------------------------------------
   bot.once('spawn', () => {
     retries = 0;
-    log('Bot en el mapa.');
+    const mcVersion = bot.registry?.version?.name || bot.registry?.version?.major || 'desconocida';
+    log(`Bot v${BOT_VERSION} en el mapa. (Minecraft ${mcVersion})`);
     loop();
   });
 
